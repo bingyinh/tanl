@@ -2488,3 +2488,96 @@ class NM_REL(TACRED):
                         'G': 'group reference'}
         return relation_map[t]
 
+@register_dataset
+class NM_NER(NERDataset):
+    """
+    NanoMine dataset (NER).
+    """
+    name = 'NM_NER'
+
+    natural_entity_types = {
+        'S': 'sample',
+        'C': 'composition',
+        'P': 'property',
+        'G': 'group reference',
+    }
+    
+    # overwrite the original function which assumes IOBES scheme with BILOU scheme
+    def load_data_single_split(self, split: str, seed: int = None) -> List[InputExample]:
+        """
+        Load data for a single split (train, dev, or test).
+        """
+        file_path = os.path.join(self.data_dir(), f'{split}.conll')
+
+        raw_examples = []
+        tokens = []
+        labels = []
+        with open(file_path, 'r') as f:
+            for line in f:
+                if line.startswith("-DOCSTART-") or line == "" or line == "\n":
+                    if tokens:
+                        raw_examples.append((tokens, labels))
+                        tokens = []
+                        labels = []
+                else:
+                    splits = line.split()
+                    tokens.append(splits[0])
+                    if len(splits) > 1:
+                        label = splits[-1].strip()
+                        if label == 'O':
+                            label = None
+                        labels.append(label)
+                    else:
+                        labels.append(None)
+
+            if tokens:
+                raw_examples.append((tokens, labels))
+
+        logging.info(f"Loaded {len(raw_examples)} sentences for split {split} of {self.name}")
+
+        examples = []
+        for i, (tokens, labels) in enumerate(raw_examples):
+            assert len(tokens) == len(labels)
+
+            # process labels
+            entities = []
+
+            current_entity_start = None
+            current_entity_type = None
+
+            for j, label in enumerate(labels + [None]):
+                previous_label = labels[j-1] if j > 0 else None
+                if (label is None and previous_label is not None) \
+                        or (label is not None and previous_label is None) \
+                        or (label is not None and previous_label is not None and (
+                            label[2:] != previous_label[2:] or label.startswith('B-') or label.startswith('U-')
+                        )):
+                    if current_entity_start is not None:
+                        # close current entity
+                        entities.append(Entity(
+                            id=len(entities),
+                            type=self.entity_types[current_entity_type],
+                            start=current_entity_start,
+                            end=j,
+                        ))
+
+                        current_entity_start = None
+                        current_entity_type = None
+
+                    if label is not None:
+                        # a new entity begins
+                        current_entity_start = j
+                        assert any(label.startswith(f'{prefix}-') for prefix in 'BIU')
+                        current_entity_type = label[2:]
+                        assert current_entity_type in self.entity_types
+
+            example = InputExample(
+                id=f'{split}-{i}',
+                tokens=tokens,
+                entities=entities,
+                relations=[],
+            )
+
+            examples.append(example)
+
+        return examples
