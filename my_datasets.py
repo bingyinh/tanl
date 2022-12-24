@@ -2581,3 +2581,24 @@ class NM_NER(NERDataset):
             examples.append(example)
 
         return examples
+
+@register_dataset
+class NM_JOINTDataset(JointERDataset):
+    """
+    NM_JOINT dataset (joint entity and relation extraction).
+
+    """
+    name = 'NM_JOINT'
+
+    natural_entity_types = {
+        'S': 'sample',
+        'C': 'composition',
+        'P': 'property',
+        'G': 'group reference',
+    }
+
+    natural_relation_types = {
+        'isPropertyOf': 'is property of',
+        'isCompositionOf': 'is composition of',
+        'isMemberOf': 'is member of',
+    }
