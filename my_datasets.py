@@ -257,6 +257,7 @@ class JointERDataset(BaseDataset):
         entity_precision_by_type = []
         entity_recall_by_type = []
         entity_f1_by_type = []
+        entity_name_by_type = []
 
         if macro:
             # compute also entity macro scores
@@ -269,6 +270,7 @@ class JointERDataset(BaseDataset):
                 entity_precision_by_type.append(precision)
                 entity_recall_by_type.append(recall)
                 entity_f1_by_type.append(f1)
+                entity_name_by_type.append(entity_type.short)
 
         relation_precision, relation_recall, relation_f1 = get_precision_recall_f1(
             num_correct=results['correct_relations'],
@@ -298,7 +300,15 @@ class JointERDataset(BaseDataset):
                 'entity_macro_recall': np.mean(np.array(entity_recall_by_type)),
                 'entity_macro_f1': np.mean(np.array(entity_f1_by_type)),
             })
-
+            for i,entity_name in enumerate(entity_name_by_type):
+                entity_res = {
+                    f'entity_{entity_name}_precision':entity_precision_by_type[i],
+                    f'entity_{entity_name}_recall':entity_recall_by_type[i],
+                    f'entity_{entity_name}_f1':entity_f1_by_type[i],
+                    }
+                res.update(entity_res)
+            # logging.info(f'my_datasets entity_res: {entity_res}')
+            # logging.info(f'my_datasets res: {res}')
         return res
 
 
@@ -2488,6 +2498,14 @@ class NM_REL(TACRED):
                         'G': 'group reference'}
         return relation_map[t]
 
+    # overwrite to enable macro average evaluation by default
+    def evaluate_dataset(self, data_args: DataTrainingArguments, model, device, batch_size: int, macro: bool = True) \
+            -> Dict[str, float]:
+        """
+        Evaluate model on this dataset, and return entity metrics only.
+        """
+        return super().evaluate_dataset(data_args, model, device, batch_size, macro=macro)
+
 @register_dataset
 class NM_NER(NERDataset):
     """
@@ -2582,6 +2600,14 @@ class NM_NER(NERDataset):
 
         return examples
 
+    # overwrite to enable macro average evaluation by default
+    def evaluate_dataset(self, data_args: DataTrainingArguments, model, device, batch_size: int, macro: bool = True) \
+            -> Dict[str, float]:
+        """
+        Evaluate model on this dataset, and return entity metrics only.
+        """
+        return super().evaluate_dataset(data_args, model, device, batch_size, macro=macro)
+
 @register_dataset
 class NM_JOINTDataset(JointERDataset):
     """
@@ -2602,3 +2628,11 @@ class NM_JOINTDataset(JointERDataset):
         'isCompositionOf': 'is composition of',
         'isMemberOf': 'is member of',
     }
+
+    # overwrite to enable macro average evaluation by default
+    def evaluate_dataset(self, data_args: DataTrainingArguments, model, device, batch_size: int, macro: bool = True) \
+            -> Dict[str, float]:
+        """
+        Evaluate model on this dataset, and return entity metrics only.
+        """
+        return super().evaluate_dataset(data_args, model, device, batch_size, macro=macro)
